@@ -69,7 +69,7 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 ### AI Services
-- **Anthropic Claude**: Requires `AI_INTEGRATIONS_ANTHROPIC_API_KEY` and `AI_INTEGRATIONS_ANTHROPIC_BASE_URL` environment variables
+- **Anthropic Claude**: Uses Replit AI Integrations (claude-sonnet-4-5 model) via `AI_INTEGRATIONS_ANTHROPIC_API_KEY` and `AI_INTEGRATIONS_ANTHROPIC_BASE_URL` environment variables (auto-configured)
 
 ### External APIs
 - **GitHub API**: Public REST API for fetching user data and repositories (rate-limited for unauthenticated requests)
