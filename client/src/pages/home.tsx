@@ -16,28 +16,28 @@ interface MatchData {
 }
 
 export default function Home() {
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analyzeMessage, setAnalyzeMessage] = useState("");
+  const [isAnalysing, setIsAnalysing] = useState(false);
+  const [analyseMessage, setAnalyseMessage] = useState("");
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   const [isMatching, setIsMatching] = useState(false);
   const [matchData, setMatchData] = useState<MatchData | null>(null);
 
-  const handleAnalyze = async (username: string) => {
+  const handleAnalyse = async (username: string) => {
     setError(null);
     setProfile(null);
     setMatchData(null);
-    setIsAnalyzing(true);
+    setIsAnalysing(true);
     
-    const messages = ["Fetching profile...", "Loading repositories...", "Analyzing code patterns...", "Extracting skills..."];
+    const messages = ["Fetching profile...", "Loading repositories...", "Analysing code patterns...", "Extracting skills..."];
     let messageIndex = 0;
-    setAnalyzeMessage(messages[0]);
+    setAnalyseMessage(messages[0]);
     
     const interval = setInterval(() => {
       messageIndex++;
       if (messageIndex < messages.length) {
-        setAnalyzeMessage(messages[messageIndex]);
+        setAnalyseMessage(messages[messageIndex]);
       }
     }, 1500);
 
@@ -59,8 +59,8 @@ export default function Home() {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       clearInterval(interval);
-      setIsAnalyzing(false);
-      setAnalyzeMessage("");
+      setIsAnalysing(false);
+      setAnalyseMessage("");
     }
   };
 
@@ -101,9 +101,9 @@ export default function Home() {
         <Header />
         
         <ProfileAnalyzer 
-          onAnalyze={handleAnalyze}
-          isLoading={isAnalyzing}
-          loadingMessage={analyzeMessage}
+          onAnalyze={handleAnalyse}
+          isLoading={isAnalysing}
+          loadingMessage={analyseMessage}
         />
 
         {error && (

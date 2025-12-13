@@ -27,7 +27,7 @@ export default function ProfileAnalyzer({
     <div className="max-w-xl mx-auto px-4" data-testid="profile-analyzer">
       <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
         <h2 className="text-xl font-semibold text-white mb-4 text-center">
-          Analyze GitHub Profile
+          Analyse GitHub Profile
         </h2>
         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
@@ -46,7 +46,7 @@ export default function ProfileAnalyzer({
             type="submit" 
             disabled={isLoading || !username.trim()}
             className="bg-purple-600 hover:bg-purple-700 text-white"
-            data-testid="button-analyze"
+            data-testid="button-analyse"
           >
             {isLoading ? (
               <>
@@ -54,7 +54,7 @@ export default function ProfileAnalyzer({
                 {loadingMessage}
               </>
             ) : (
-              "Analyze"
+              "Analyse"
             )}
           </Button>
         </form>

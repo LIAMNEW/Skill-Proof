@@ -5,11 +5,11 @@ export default function ProfileAnalyzerExample() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
 
-  const handleAnalyze = (username: string) => {
-    console.log('Analyzing profile:', username);
+  const handleAnalyse = (username: string) => {
+    console.log('Analysing profile:', username);
     setIsLoading(true);
     
-    const messages = ["Fetching profile...", "Analyzing repositories...", "Extracting skills..."];
+    const messages = ["Fetching profile...", "Analysing repositories...", "Extracting skills..."];
     let i = 0;
     setLoadingMessage(messages[0]);
     
@@ -26,7 +26,7 @@ export default function ProfileAnalyzerExample() {
 
   return (
     <ProfileAnalyzer 
-      onAnalyze={handleAnalyze} 
+      onAnalyze={handleAnalyse} 
       isLoading={isLoading} 
       loadingMessage={loadingMessage} 
     />
