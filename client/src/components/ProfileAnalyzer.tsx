@@ -25,7 +25,7 @@ export default function ProfileAnalyzer({
 
   return (
     <div className="max-w-xl mx-auto px-4" data-testid="profile-analyzer">
-      <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+      <div className="bg-white/5 backdrop-blur-lg border border-amber-500/20 rounded-2xl p-6">
         <h2 className="text-xl font-semibold text-white mb-4 text-center">
           Analyse GitHub Profile
         </h2>
@@ -37,7 +37,7 @@ export default function ProfileAnalyzer({
               placeholder="e.g., torvalds, gaearon, tj"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-gray-500 focus-visible:ring-purple-400"
+              className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-gray-500 focus-visible:ring-amber-400"
               disabled={isLoading}
               data-testid="input-github-username"
             />
@@ -45,7 +45,7 @@ export default function ProfileAnalyzer({
           <Button 
             type="submit" 
             disabled={isLoading || !username.trim()}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
+            className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold"
             data-testid="button-analyse"
           >
             {isLoading ? (

@@ -4,11 +4,11 @@ export default function Header() {
   return (
     <header className="text-center py-12 px-4" data-testid="header">
       <div className="flex items-center justify-center gap-3 mb-4">
-        <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-lg border border-white/20">
-          <Github className="w-8 h-8 text-purple-400" />
+        <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-lg border border-amber-500/20">
+          <Github className="w-8 h-8 text-amber-400" />
         </div>
         <h1 
-          className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-400 via-blue-400 to-purple-400 bg-clip-text text-transparent"
+          className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 bg-clip-text text-transparent"
           data-testid="text-app-title"
         >
           SkillProof

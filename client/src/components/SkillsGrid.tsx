@@ -8,15 +8,15 @@ interface SkillsGridProps {
 
 const proficiencyColors: Record<string, string> = {
   expert: "bg-green-500/20 text-green-400 border-green-500/30",
-  intermediate: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  beginner: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  intermediate: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  beginner: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
 export default function SkillsGrid({ skills, proficiencyLevels }: SkillsGridProps) {
   return (
-    <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6" data-testid="skills-grid">
+    <div className="bg-white/5 backdrop-blur-lg border border-amber-500/20 rounded-2xl p-6" data-testid="skills-grid">
       <div className="flex items-center gap-2 mb-4">
-        <Award className="w-5 h-5 text-purple-400" />
+        <Award className="w-5 h-5 text-amber-400" />
         <h3 className="text-lg font-semibold text-white">Technical Skills</h3>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

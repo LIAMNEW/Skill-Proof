@@ -28,10 +28,10 @@ export default function MatchResults({
 
   return (
     <div className="space-y-6" data-testid="match-results">
-      <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 text-center">
+      <div className="bg-white/5 backdrop-blur-lg border border-amber-500/20 rounded-2xl p-8 text-center">
         <div className="mb-4">
           <span 
-            className="text-7xl md:text-8xl font-bold bg-gradient-to-r from-purple-400 via-blue-400 to-green-400 bg-clip-text text-transparent"
+            className="text-7xl md:text-8xl font-bold bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 bg-clip-text text-transparent"
             data-testid="text-match-score"
           >
             {matchScore}%
@@ -47,7 +47,7 @@ export default function MatchResults({
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+        <div className="bg-white/5 backdrop-blur-lg border border-amber-500/20 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <CheckCircle className="w-5 h-5 text-green-400" />
             <h4 className="font-semibold text-white">Matching Skills</h4>
@@ -65,7 +65,7 @@ export default function MatchResults({
           </div>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+        <div className="bg-white/5 backdrop-blur-lg border border-amber-500/20 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <XCircle className="w-5 h-5 text-orange-400" />
             <h4 className="font-semibold text-white">Missing Skills</h4>
@@ -89,7 +89,7 @@ export default function MatchResults({
       </div>
 
       {strengthsForRole && strengthsForRole.length > 0 && (
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+        <div className="bg-white/5 backdrop-blur-lg border border-amber-500/20 rounded-2xl p-6">
           <h4 className="font-semibold text-white mb-3">Strengths for This Role</h4>
           <ul className="space-y-2">
             {strengthsForRole.map((strength, i) => (
@@ -102,9 +102,9 @@ export default function MatchResults({
         </div>
       )}
 
-      <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 backdrop-blur-lg border border-purple-500/30 rounded-2xl p-6">
+      <div className="bg-gradient-to-br from-amber-900/30 to-amber-800/20 backdrop-blur-lg border border-amber-500/30 rounded-2xl p-6">
         <div className="flex items-center gap-2 mb-3">
-          <MessageSquare className="w-5 h-5 text-purple-400" />
+          <MessageSquare className="w-5 h-5 text-amber-400" />
           <h4 className="font-semibold text-white">AI Analysis</h4>
         </div>
         <p className="text-gray-300 text-sm leading-relaxed" data-testid="text-match-reasoning">

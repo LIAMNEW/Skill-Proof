@@ -12,9 +12,9 @@ interface LanguageChartProps {
 
 export default function LanguageChart({ languages }: LanguageChartProps) {
   return (
-    <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6" data-testid="language-chart">
+    <div className="bg-white/5 backdrop-blur-lg border border-amber-500/20 rounded-2xl p-6" data-testid="language-chart">
       <div className="flex items-center gap-2 mb-4">
-        <Code className="w-5 h-5 text-blue-400" />
+        <Code className="w-5 h-5 text-amber-400" />
         <h3 className="text-lg font-semibold text-white">Language Distribution</h3>
       </div>
       <div className="space-y-3">

@@ -21,11 +21,11 @@ export default function ProfileCard({
   location 
 }: ProfileCardProps) {
   return (
-    <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6" data-testid="profile-card">
+    <div className="bg-white/5 backdrop-blur-lg border border-amber-500/20 rounded-2xl p-6" data-testid="profile-card">
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
-        <Avatar className="w-20 h-20 border-2 border-purple-400/50">
+        <Avatar className="w-20 h-20 border-2 border-amber-400/50">
           <AvatarImage src={avatar} alt={name} />
-          <AvatarFallback className="bg-purple-600 text-white text-xl">
+          <AvatarFallback className="bg-amber-600 text-slate-900 text-xl font-bold">
             {name?.charAt(0) || username?.charAt(0) || "?"}
           </AvatarFallback>
         </Avatar>
