@@ -21,9 +21,9 @@ Preferred communication style: Simple, everyday language.
 - **Bundler**: Vite for development and production builds
 - **Routing**: Wouter (lightweight React router)
 - **State Management**: TanStack Query for server state and caching
-- **Styling**: Tailwind CSS with a dark gradient theme (slate-900 to purple-900)
+- **Styling**: Tailwind CSS with Noir & Gold theme (charcoal gradient #0a0a0f to #1a1a24)
 - **UI Components**: Shadcn/ui component library built on Radix UI primitives
-- **Design System**: Glass morphism effects with white/10 opacity backgrounds, purple/blue accent colors
+- **Design System**: Glass morphism effects with white/5 opacity backgrounds, gold/amber accent colors (amber-400, amber-500)
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express
