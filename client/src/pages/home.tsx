@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Users, Search, History, X, Save, FolderOpen, FileDown } from "lucide-react";
+import { Users, Search, History, X, Save, FolderOpen, FileDown, Dna } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
@@ -9,6 +9,8 @@ import ProfileResults, { type ProfileData } from "@/components/ProfileResults";
 import JobMatcher from "@/components/JobMatcher";
 import MatchResults from "@/components/MatchResults";
 import ErrorCard from "@/components/ErrorCard";
+import CodeDNACard from "@/components/CodeDNACard";
+import type { CodeDNA } from "@shared/schema";
 
 interface MatchData {
   matchScore: number;
@@ -78,6 +80,8 @@ export default function Home() {
   const [jobDescription, setJobDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [codeDna, setCodeDna] = useState<CodeDNA | null>(null);
+  const [isAnalyzingDna, setIsAnalyzingDna] = useState(false);
   
   const { toast } = useToast();
 
@@ -89,6 +93,7 @@ export default function Home() {
     setError(null);
     setProfile(null);
     setMatchData(null);
+    setCodeDna(null);
     setIsAnalysing(true);
     
     const messages = ["Fetching profile...", "Loading repositories...", "Analysing code patterns...", "Extracting skills..."];
@@ -130,6 +135,7 @@ export default function Home() {
   const handleLoadSavedProfile = (savedProfile: ProfileData) => {
     setProfile(savedProfile);
     setMatchData(null);
+    setCodeDna(null);
     setError(null);
   };
 
@@ -246,6 +252,35 @@ export default function Home() {
     }
   };
 
+  const handleAnalyzeCodeDNA = async () => {
+    if (!profile) return;
+    
+    setIsAnalyzingDna(true);
+    try {
+      const response = await fetch("/api/code-dna", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: profile.username }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to analyze Code DNA");
+      }
+
+      const data = await response.json();
+      setCodeDna(data);
+    } catch (err) {
+      toast({
+        title: "Failed to analyze Code DNA",
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzingDna(false);
+    }
+  };
+
   const handleRetry = () => {
     setError(null);
   };
@@ -346,7 +381,21 @@ export default function Home() {
                 <FileDown className="w-4 h-4 mr-2" />
                 {isExporting ? "Generating..." : "Download PDF Report"}
               </Button>
+              <Button
+                onClick={handleAnalyzeCodeDNA}
+                disabled={isAnalyzingDna}
+                variant="outline"
+                className="border-amber-500/30 text-amber-400"
+                data-testid="button-analyze-dna"
+              >
+                <Dna className="w-4 h-4 mr-2" />
+                {isAnalyzingDna ? "Analyzing DNA..." : "Generate Code DNA"}
+              </Button>
             </div>
+            
+            {codeDna && (
+              <CodeDNACard dna={codeDna} />
+            )}
             
             <div className="border-t border-white/10 pt-8">
               <JobMatcher 

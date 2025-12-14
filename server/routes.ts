@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import axios from "axios";
 import PDFDocument from "pdfkit";
 import { storage } from "./storage";
-import { insertSavedAnalysisSchema } from "@shared/schema";
+import { insertSavedAnalysisSchema, type CodeDNA } from "@shared/schema";
 
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
@@ -76,6 +76,7 @@ interface CacheEntry<T> {
 
 const githubCache = new Map<string, CacheEntry<{ user: any; repos: any[] }>>();
 const profileCache = new Map<string, CacheEntry<ProfileData>>();
+const codeDnaCache = new Map<string, CacheEntry<CodeDNA>>();
 
 function isCacheValid<T>(entry: CacheEntry<T> | undefined): entry is CacheEntry<T> {
   return entry !== undefined && (Date.now() - entry.timestamp) < CACHE_TTL;
@@ -391,6 +392,229 @@ Now analyze this match. Return ONLY valid JSON:
   };
 }
 
+const CODE_DNA_SYSTEM_PROMPT = `You are an expert developer profiler that analyzes GitHub activity patterns to create a "Code DNA" fingerprint. 
+
+Analyze the provided data to determine:
+
+1. **Personality** - Infer from commit messages and repo patterns:
+   - communicationStyle: "Concise" (short commits), "Detailed" (verbose descriptions), or "Visual" (heavy readme/doc focus)
+   - documentationHabits: "Extensive" (many READMEs, docs), "Moderate" (some docs), or "Minimal" (code-focused)
+   - commitStyle: "Atomic" (small focused commits), "Feature-based" (larger feature commits), or "Mixed"
+
+2. **Collaboration** - Infer from activity patterns:
+   - role: "Mentor" (helps others, many forks), "Contributor" (contributes to many projects), "Solo Builder" (mostly own projects), or "Architect" (designs complex systems)
+   - prQuality: Score 1-100 based on project complexity and activity
+   - reviewActivity: "Active Reviewer", "Occasional", or "Rare"
+
+3. **Technical DNA** - Infer from repo structures:
+   - codeStructure: "Functional" (FP languages/patterns), "OOP" (class-heavy), or "Hybrid"
+   - testingApproach: "TDD Advocate" (test folders visible), "Pragmatic" (some tests), or "Minimal"
+   - architecturePreference: "Microservices" (many small repos), "Monolithic" (large repos), or "Modular" (balanced)
+
+4. **Evolution** - Analyze growth over time:
+   - primaryGrowthArea: Current focus area (e.g., "Cloud Infrastructure", "Machine Learning")
+   - languageProgression: Track languages by year
+   - complexityTrend: "Increasing" (tackling harder problems), "Stable" (consistent complexity), or "Exploring" (trying new areas)
+
+5. **Unique Markers** - Special identifiers like: "Open Source Contributor", "Framework Author", "Documentation Champion", etc.
+
+Return valid JSON only.`;
+
+const CODE_DNA_FEW_SHOT = `Example output:
+{
+  "personality": {
+    "communicationStyle": "Detailed",
+    "documentationHabits": "Extensive",
+    "commitStyle": "Atomic"
+  },
+  "collaboration": {
+    "role": "Architect",
+    "prQuality": 85,
+    "reviewActivity": "Active Reviewer"
+  },
+  "technicalDNA": {
+    "codeStructure": "Hybrid",
+    "testingApproach": "Pragmatic",
+    "architecturePreference": "Modular"
+  },
+  "evolution": {
+    "primaryGrowthArea": "Cloud Native Development",
+    "languageProgression": [
+      { "year": 2021, "languages": ["JavaScript", "Python"] },
+      { "year": 2022, "languages": ["TypeScript", "Python", "Go"] },
+      { "year": 2023, "languages": ["TypeScript", "Rust", "Go"] }
+    ],
+    "complexityTrend": "Increasing"
+  },
+  "uniqueMarkers": ["Open Source Contributor", "Framework Author", "TypeScript Expert"]
+}`;
+
+async function fetchCommitsForRepos(username: string, repos: any[]): Promise<any[]> {
+  const headers = getGitHubHeaders();
+  const commitData: any[] = [];
+  
+  const topRepos = repos.slice(0, 5);
+  
+  for (const repo of topRepos) {
+    try {
+      const commitsResponse = await axios.get(
+        `https://api.github.com/repos/${username}/${repo.name}/commits?author=${username}&per_page=10`,
+        { headers }
+      );
+      
+      rateLimitRemaining = parseInt(commitsResponse.headers['x-ratelimit-remaining'] || '60');
+      
+      commitData.push(...commitsResponse.data.map((c: any) => ({
+        repo: repo.name,
+        message: c.commit?.message?.substring(0, 200) || "",
+        date: c.commit?.author?.date || "",
+      })));
+      
+      await delay(200);
+    } catch (e) {
+      console.log(`Could not fetch commits for ${repo.name}`);
+    }
+  }
+  
+  return commitData;
+}
+
+function analyzeReposByYear(repos: any[]): Array<{ year: number; languages: string[] }> {
+  const yearData: Record<number, Set<string>> = {};
+  
+  for (const repo of repos) {
+    if (repo.created_at && repo.language) {
+      const year = new Date(repo.created_at).getFullYear();
+      if (!yearData[year]) {
+        yearData[year] = new Set();
+      }
+      yearData[year].add(repo.language);
+    }
+  }
+  
+  return Object.entries(yearData)
+    .sort(([a], [b]) => parseInt(a) - parseInt(b))
+    .slice(-5)
+    .map(([year, langs]) => ({
+      year: parseInt(year),
+      languages: Array.from(langs),
+    }));
+}
+
+async function analyzeCodeDNA(username: string): Promise<CodeDNA> {
+  const cacheKey = username.toLowerCase();
+  const cached = codeDnaCache.get(cacheKey);
+  
+  if (isCacheValid(cached)) {
+    console.log(`Cache hit for Code DNA: ${username}`);
+    return cached.data;
+  }
+  
+  const { user, repos } = await fetchGitHubData(username);
+  const commits = await fetchCommitsForRepos(username, repos);
+  const languageProgression = analyzeReposByYear(repos);
+  
+  const repoInfo = repos.slice(0, 15).map((r: any) => ({
+    name: r.name,
+    description: r.description || "",
+    language: r.language,
+    stars: r.stargazers_count,
+    forks: r.forks_count,
+    hasTests: r.name.includes("test") || r.description?.toLowerCase().includes("test"),
+    createdAt: r.created_at,
+    size: r.size,
+  }));
+  
+  const prompt = `Analyze this GitHub developer's "Code DNA" fingerprint.
+
+User: ${user.name || username}
+Bio: ${user.bio || "No bio"}
+Public Repos: ${user.public_repos}
+Followers: ${user.followers}
+Following: ${user.following}
+Account Created: ${user.created_at}
+
+Recent Repositories:
+${JSON.stringify(repoInfo, null, 2)}
+
+Recent Commits (sample):
+${JSON.stringify(commits.slice(0, 20), null, 2)}
+
+Language Progression Over Time:
+${JSON.stringify(languageProgression, null, 2)}
+
+${CODE_DNA_FEW_SHOT}
+
+Now analyze this developer's Code DNA. Return ONLY valid JSON matching the structure above.`;
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-5",
+    max_tokens: 2000,
+    system: CODE_DNA_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const topLanguages = repos.slice(0, 5).map((r: any) => r.language).filter(Boolean);
+  const primaryLanguage = topLanguages[0] || "Software";
+  
+  const defaultDnaData = {
+    personality: {
+      communicationStyle: "Mixed" as const,
+      documentationHabits: "Moderate" as const,
+      commitStyle: "Mixed" as const,
+    },
+    collaboration: {
+      role: "Contributor" as const,
+      prQuality: 70,
+      reviewActivity: "Occasional" as const,
+    },
+    technicalDNA: {
+      codeStructure: "Hybrid" as const,
+      testingApproach: "Pragmatic" as const,
+      architecturePreference: "Modular" as const,
+    },
+    evolution: {
+      primaryGrowthArea: "Software Development",
+      languageProgression,
+      complexityTrend: "Stable" as const,
+    },
+    uniqueMarkers: [`${primaryLanguage} Developer`, "Active Contributor"],
+    isDefaultFallback: true,
+  };
+
+  let dnaData = defaultDnaData;
+  try {
+    const textContent = response.content.find(c => c.type === "text");
+    if (textContent && textContent.type === "text") {
+      const parsed = extractJSONFromResponse(textContent.text);
+      if (parsed && parsed.personality && parsed.collaboration && parsed.technicalDNA && parsed.evolution) {
+        dnaData = parsed;
+      }
+    }
+  } catch (parseError) {
+    console.log("Failed to parse Code DNA response, using defaults");
+  }
+
+  const codeDna: CodeDNA = {
+    username: user.login,
+    personality: dnaData.personality || defaultDnaData.personality,
+    collaboration: dnaData.collaboration || defaultDnaData.collaboration,
+    technicalDNA: dnaData.technicalDNA || defaultDnaData.technicalDNA,
+    evolution: {
+      primaryGrowthArea: dnaData.evolution?.primaryGrowthArea || "Software Development",
+      languageProgression: dnaData.evolution?.languageProgression || languageProgression,
+      complexityTrend: dnaData.evolution?.complexityTrend || "Stable",
+    },
+    uniqueMarkers: (dnaData.uniqueMarkers && dnaData.uniqueMarkers.length > 0) 
+      ? dnaData.uniqueMarkers 
+      : defaultDnaData.uniqueMarkers,
+  };
+  
+  codeDnaCache.set(cacheKey, { data: codeDna, timestamp: Date.now() });
+  
+  return codeDna;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -666,6 +890,30 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Delete analysis error:", error);
       res.status(500).json({ error: error.message || "Failed to delete analysis" });
+    }
+  });
+
+  app.post("/api/code-dna", async (req, res) => {
+    try {
+      const { username } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({ error: "Username is required" });
+      }
+
+      const codeDna = await analyzeCodeDNA(username);
+      res.json(codeDna);
+    } catch (error: any) {
+      console.error("Code DNA analysis error:", error);
+      
+      if (error.response?.status === 404) {
+        return res.status(404).json({ error: `GitHub user '${req.body.username}' not found` });
+      }
+      if (error.response?.status === 403) {
+        return res.status(429).json({ error: "GitHub API rate limit exceeded. Please try again later." });
+      }
+      
+      res.status(500).json({ error: error.message || "Failed to analyze Code DNA" });
     }
   });
 

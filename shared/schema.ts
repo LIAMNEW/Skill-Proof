@@ -33,3 +33,37 @@ export const insertSavedAnalysisSchema = createInsertSchema(savedAnalyses).omit(
 
 export type InsertSavedAnalysis = z.infer<typeof insertSavedAnalysisSchema>;
 export type SavedAnalysis = typeof savedAnalyses.$inferSelect;
+
+// Code DNA Fingerprint types (no database table - used for API responses)
+export interface CodeDNAPersonality {
+  communicationStyle: "Concise" | "Detailed" | "Visual";
+  documentationHabits: "Extensive" | "Moderate" | "Minimal";
+  commitStyle: "Atomic" | "Feature-based" | "Mixed";
+}
+
+export interface CodeDNACollaboration {
+  role: "Mentor" | "Contributor" | "Solo Builder" | "Architect";
+  prQuality: number;
+  reviewActivity: "Active Reviewer" | "Occasional" | "Rare";
+}
+
+export interface CodeDNATechnical {
+  codeStructure: "Functional" | "OOP" | "Hybrid";
+  testingApproach: "TDD Advocate" | "Pragmatic" | "Minimal";
+  architecturePreference: "Microservices" | "Monolithic" | "Modular";
+}
+
+export interface CodeDNAEvolution {
+  primaryGrowthArea: string;
+  languageProgression: Array<{ year: number; languages: string[] }>;
+  complexityTrend: "Increasing" | "Stable" | "Exploring";
+}
+
+export interface CodeDNA {
+  username: string;
+  personality: CodeDNAPersonality;
+  collaboration: CodeDNACollaboration;
+  technicalDNA: CodeDNATechnical;
+  evolution: CodeDNAEvolution;
+  uniqueMarkers: string[];
+}
