@@ -13,6 +13,7 @@ The platform allows users to:
 - **Developer Search**: Search GitHub for developers by skills, location, minimum repos, and minimum followers, then select candidates to compare
 - **Saved Analyses**: Save profile analyses to PostgreSQL database and view/reload them later from the /saved page
 - **PDF Export**: Download professional PDF reports with profile info, skills, languages, match scores, and recommendations
+- **Code DNA Fingerprint**: Generate a unique developer fingerprint analyzing personality, collaboration style, technical preferences, and career evolution
 
 ## User Preferences
 
@@ -68,7 +69,7 @@ Preferred communication style: Simple, everyday language.
 1. **Monorepo Structure**: Client and server in single repository with shared types for type safety across the stack
 2. **Path Aliases**: `@/` for client source, `@shared/` for shared code, `@assets/` for attached files
 3. **Component Examples**: Each component has an example file in `components/examples/` for isolated testing
-4. **API Design**: POST endpoints for analysis operations (`/api/analyze-github`, `/api/match-job`, `/api/batch-compare`, `/api/search-developers`)
+4. **API Design**: POST endpoints for analysis operations (`/api/analyze-github`, `/api/match-job`, `/api/batch-compare`, `/api/search-developers`, `/api/code-dna`)
 5. **Multi-page Navigation**: Three main pages - Home (/), Batch Compare (/compare), Developer Search (/search) with navigation between them
 
 ## External Dependencies
@@ -95,6 +96,7 @@ Preferred communication style: Simple, everyday language.
 ### Server-side Caching
 - GitHub API responses cached in-memory for 1 hour (reduces API calls)
 - Profile analysis results cached to avoid redundant AI calls
+- Code DNA fingerprints cached to avoid redundant commit fetching and AI analysis
 - Cache endpoints: `GET /api/cache-status`, `POST /api/clear-cache`
 
 ### AI Prompt Improvements
