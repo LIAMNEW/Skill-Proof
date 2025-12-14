@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Users, Search, History, X, Save, FolderOpen, FileDown, Dna, MessageCircleQuestion } from "lucide-react";
+import { Users, Search, History, X, Save, FolderOpen, FileDown, Dna, MessageCircleQuestion, GitPullRequest } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
@@ -11,6 +11,7 @@ import MatchResults from "@/components/MatchResults";
 import ErrorCard from "@/components/ErrorCard";
 import CodeDNACard from "@/components/CodeDNACard";
 import InterviewQuestionsCard from "@/components/InterviewQuestionsCard";
+import OpenSourceContributionsCard from "@/components/OpenSourceContributionsCard";
 import type { CodeDNA } from "@shared/schema";
 
 interface InterviewQuestion {
@@ -93,6 +94,12 @@ export default function Home() {
   const [isAnalyzingDna, setIsAnalyzingDna] = useState(false);
   const [interviewQuestions, setInterviewQuestions] = useState<InterviewQuestion[]>([]);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [contributions, setContributions] = useState<{
+    contributions: any[];
+    totalExternalRepos: number;
+    totalContributions: number;
+  } | null>(null);
+  const [isFetchingContributions, setIsFetchingContributions] = useState(false);
   
   const { toast } = useToast();
 
@@ -106,6 +113,7 @@ export default function Home() {
     setMatchData(null);
     setCodeDna(null);
     setInterviewQuestions([]);
+    setContributions(null);
     setIsAnalysing(true);
     
     const messages = ["Fetching profile...", "Loading repositories...", "Analysing code patterns...", "Extracting skills..."];
@@ -149,6 +157,7 @@ export default function Home() {
     setMatchData(null);
     setCodeDna(null);
     setInterviewQuestions([]);
+    setContributions(null);
     setError(null);
   };
 
@@ -327,6 +336,35 @@ export default function Home() {
     }
   };
 
+  const handleFetchContributions = async () => {
+    if (!profile) return;
+    
+    setIsFetchingContributions(true);
+    try {
+      const response = await fetch("/api/contributions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: profile.username }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch contributions");
+      }
+
+      const data = await response.json();
+      setContributions(data);
+    } catch (err) {
+      toast({
+        title: "Failed to fetch contributions",
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFetchingContributions(false);
+    }
+  };
+
   const handleRetry = () => {
     setError(null);
   };
@@ -437,10 +475,28 @@ export default function Home() {
                 <Dna className="w-4 h-4 mr-2" />
                 {isAnalyzingDna ? "Analyzing DNA..." : "Generate Code DNA"}
               </Button>
+              <Button
+                onClick={handleFetchContributions}
+                disabled={isFetchingContributions}
+                variant="outline"
+                className="border-amber-500/30 text-amber-400"
+                data-testid="button-fetch-contributions"
+              >
+                <GitPullRequest className="w-4 h-4 mr-2" />
+                {isFetchingContributions ? "Loading..." : "Open Source Contributions"}
+              </Button>
             </div>
             
             {codeDna && (
               <CodeDNACard dna={codeDna} />
+            )}
+            
+            {contributions && (
+              <OpenSourceContributionsCard
+                contributions={contributions.contributions}
+                totalExternalRepos={contributions.totalExternalRepos}
+                totalContributions={contributions.totalContributions}
+              />
             )}
             
             <div className="border-t border-white/10 pt-8">

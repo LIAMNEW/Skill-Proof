@@ -150,10 +150,25 @@ async function fetchGitHubData(username: string) {
 
 function calculateLanguageStats(repos: any[]) {
   const languageCounts: Record<string, number> = {};
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
   
   for (const repo of repos) {
     if (repo.language) {
-      languageCounts[repo.language] = (languageCounts[repo.language] || 0) + (repo.size || 1);
+      const size = repo.size || 1;
+      const updatedDate = new Date(repo.updated_at);
+      
+      // Weight recent repos 3x more, repos from last year 1.5x more
+      let weight = 1;
+      if (updatedDate > sixMonthsAgo) {
+        weight = 3; // Recent activity gets 3x weight
+      } else if (updatedDate > oneYearAgo) {
+        weight = 1.5; // Last year gets 1.5x weight
+      }
+      
+      languageCounts[repo.language] = (languageCounts[repo.language] || 0) + (size * weight);
     }
   }
 
@@ -293,6 +308,8 @@ Your task is to:
 2. Categorize proficiency levels based on evidence (expert: many repos/stars, intermediate: some repos, beginner: few repos)
 3. Identify strengths based on project complexity and contributions
 4. Write concise, professional summaries
+
+IMPORTANT: Weight recent activity heavily. Skills demonstrated in the last 6 months should be considered 3x more relevant than older work. This reflects current expertise vs historical knowledge.
 
 Skill categories to consider:
 - Programming Languages (JavaScript, Python, Go, Rust, etc.)
@@ -1281,6 +1298,120 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("PDF export error:", error);
       res.status(500).json({ error: error.message || "Failed to generate PDF" });
+    }
+  });
+
+  // Open Source Contributions endpoint
+  app.post("/api/contributions", async (req, res) => {
+    try {
+      const { username } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({ error: "Username is required" });
+      }
+
+      const headers = getGitHubHeaders();
+      
+      // Fetch user's public events (last 100 events)
+      const eventsResponse = await axios.get(
+        `https://api.github.com/users/${username}/events/public?per_page=100`,
+        { headers }
+      );
+
+      const events = eventsResponse.data;
+      
+      // Filter for contribution events (PushEvent, PullRequestEvent, IssuesEvent, IssueCommentEvent)
+      const contributionTypes = ['PushEvent', 'PullRequestEvent', 'IssuesEvent', 'IssueCommentEvent', 'CreateEvent'];
+      
+      // Track contributions to repos not owned by the user
+      const externalContributions = new Map<string, {
+        repoName: string;
+        repoUrl: string;
+        owner: string;
+        contributions: number;
+        types: Set<string>;
+        lastActivity: string;
+      }>();
+
+      const usernameLower = username.toLowerCase();
+
+      for (const event of events) {
+        if (!contributionTypes.includes(event.type)) continue;
+        
+        const repoName = event.repo?.name;
+        if (!repoName) continue;
+        
+        // Check if this is an external repo (not owned by the user)
+        const [owner] = repoName.split('/');
+        if (owner.toLowerCase() === usernameLower) continue;
+        
+        if (!externalContributions.has(repoName)) {
+          externalContributions.set(repoName, {
+            repoName,
+            repoUrl: `https://github.com/${repoName}`,
+            owner,
+            contributions: 0,
+            types: new Set(),
+            lastActivity: event.created_at,
+          });
+        }
+        
+        const contrib = externalContributions.get(repoName)!;
+        contrib.contributions++;
+        contrib.types.add(event.type);
+      }
+
+      // Fetch star counts for external repos (top 10 by contribution count)
+      const topContributions = Array.from(externalContributions.values())
+        .sort((a, b) => b.contributions - a.contributions)
+        .slice(0, 10);
+
+      const enrichedContributions = await Promise.all(
+        topContributions.map(async (contrib) => {
+          try {
+            const repoResponse = await axios.get(
+              `https://api.github.com/repos/${contrib.repoName}`,
+              { headers }
+            );
+            return {
+              ...contrib,
+              types: Array.from(contrib.types),
+              stars: repoResponse.data.stargazers_count,
+              forks: repoResponse.data.forks_count,
+              description: repoResponse.data.description,
+              language: repoResponse.data.language,
+            };
+          } catch {
+            return {
+              ...contrib,
+              types: Array.from(contrib.types),
+              stars: 0,
+              forks: 0,
+              description: null,
+              language: null,
+            };
+          }
+        })
+      );
+
+      // Sort by stars (highlight major projects)
+      const sortedByStars = enrichedContributions.sort((a, b) => b.stars - a.stars);
+
+      res.json({
+        contributions: sortedByStars,
+        totalExternalRepos: externalContributions.size,
+        totalContributions: Array.from(externalContributions.values())
+          .reduce((sum, c) => sum + c.contributions, 0),
+      });
+    } catch (error: any) {
+      console.error("Contributions fetch error:", error);
+      if (error.response?.status === 404) {
+        return res.status(404).json({ error: `GitHub user not found` });
+      }
+      if (error.response?.status === 403) {
+        return res.status(429).json({ error: "GitHub API rate limit exceeded" });
+      }
+      res.status(500).json({ error: error.message || "Failed to fetch contributions" });
     }
   });
 
