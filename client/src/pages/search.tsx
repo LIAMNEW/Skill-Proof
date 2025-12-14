@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Header from "@/components/Header";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, Search, MapPin, GitBranch, Users as UsersIcon, Loader2, Plus, ExternalLink } from "lucide-react";
+import { ArrowLeft, Search, Loader2, Plus, ExternalLink, MapPin, GitBranch, Users as UsersIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,9 +13,7 @@ interface Developer {
   name: string;
   avatar: string;
   bio: string;
-  repos: number;
-  followers: number;
-  location: string;
+  score?: number;
   profileUrl: string;
 }
 
@@ -313,20 +311,11 @@ export default function CandidateSearch() {
                           <p className="text-sm text-gray-300 mt-1 line-clamp-2">{dev.bio}</p>
                         )}
                         <div className="flex items-center gap-4 mt-2 text-sm text-gray-400 flex-wrap">
-                          {dev.location && (
+                          {dev.score && (
                             <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {dev.location}
+                              Relevance: {Math.round(dev.score)}
                             </span>
                           )}
-                          <span className="flex items-center gap-1">
-                            <GitBranch className="w-3 h-3" />
-                            {dev.repos} repos
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <UsersIcon className="w-3 h-3" />
-                            {dev.followers} followers
-                          </span>
                         </div>
                       </div>
 

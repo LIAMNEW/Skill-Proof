@@ -357,36 +357,14 @@ export async function registerRoutes(
         { headers: { Accept: "application/vnd.github.v3+json" } }
       );
 
-      const users = await Promise.all(
-        response.data.items.slice(0, 10).map(async (user: any) => {
-          try {
-            const userDetails = await axios.get(user.url, {
-              headers: { Accept: "application/vnd.github.v3+json" },
-            });
-            return {
-              username: user.login,
-              name: userDetails.data.name || user.login,
-              avatar: user.avatar_url,
-              bio: userDetails.data.bio || "",
-              repos: userDetails.data.public_repos,
-              followers: userDetails.data.followers,
-              location: userDetails.data.location,
-              profileUrl: user.html_url,
-            };
-          } catch {
-            return {
-              username: user.login,
-              name: user.login,
-              avatar: user.avatar_url,
-              bio: "",
-              repos: 0,
-              followers: 0,
-              location: "",
-              profileUrl: user.html_url,
-            };
-          }
-        })
-      );
+      const users = response.data.items.slice(0, 15).map((user: any) => ({
+        username: user.login,
+        name: user.login,
+        avatar: user.avatar_url,
+        bio: "",
+        score: user.score,
+        profileUrl: user.html_url,
+      }));
 
       res.json({
         developers: users,
