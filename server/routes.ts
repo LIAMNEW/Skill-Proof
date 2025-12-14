@@ -563,18 +563,37 @@ export async function registerRoutes(
       }
 
       const response = await axios.get(
-        `https://api.github.com/search/users?q=${encodeURIComponent(query)}&per_page=20`,
+        `https://api.github.com/search/users?q=${encodeURIComponent(query)}&per_page=15`,
         { headers: getGitHubHeaders() }
       );
 
-      const users = response.data.items.slice(0, 15).map((user: any) => ({
-        username: user.login,
-        name: user.login,
-        avatar: user.avatar_url,
-        bio: "",
-        score: user.score,
-        profileUrl: user.html_url,
-      }));
+      const usernames = response.data.items.slice(0, 10).map((u: any) => u.login);
+      
+      const userDetails = await Promise.all(
+        usernames.map(async (username: string) => {
+          try {
+            const { user } = await fetchGitHubData(username);
+            return user;
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const users = response.data.items.slice(0, 10).map((user: any, index: number) => {
+        const details = userDetails[index];
+        return {
+          username: user.login,
+          name: details?.name || user.login,
+          avatar: user.avatar_url,
+          bio: details?.bio || "",
+          score: user.score,
+          profileUrl: user.html_url,
+          repos: details?.public_repos,
+          followers: details?.followers,
+          location: details?.location,
+        };
+      });
 
       res.json({
         developers: users,

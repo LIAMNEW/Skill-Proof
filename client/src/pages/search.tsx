@@ -15,7 +15,15 @@ interface Developer {
   bio: string;
   score?: number;
   profileUrl: string;
+  repos?: number;
+  followers?: number;
+  location?: string;
 }
+
+const SUGGESTED_SKILLS = [
+  "JavaScript", "Python", "React", "TypeScript", "Node.js", 
+  "Go", "Rust", "Java", "AWS", "Docker", "Kubernetes", "PostgreSQL"
+];
 
 interface SearchResult {
   developers: Developer[];
@@ -50,6 +58,16 @@ export default function CandidateSearch() {
     const updated = [...skills];
     updated[index] = value;
     setSkills(updated);
+  };
+
+  const addSuggestedSkill = (skill: string) => {
+    if (skills.some(s => s.toLowerCase() === skill.toLowerCase())) return;
+    const emptyIndex = skills.findIndex(s => !s.trim());
+    if (emptyIndex >= 0) {
+      updateSkill(emptyIndex, skill);
+    } else if (skills.length < 5) {
+      setSkills([...skills, skill]);
+    }
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -173,6 +191,26 @@ export default function CandidateSearch() {
                   Add Skill
                 </Button>
               )}
+              
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <span className="text-xs text-gray-500">Popular:</span>
+                {SUGGESTED_SKILLS.map((skill) => (
+                  <button
+                    key={skill}
+                    type="button"
+                    onClick={() => addSuggestedSkill(skill)}
+                    disabled={isLoading || skills.some(s => s.toLowerCase() === skill.toLowerCase())}
+                    className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                      skills.some(s => s.toLowerCase() === skill.toLowerCase())
+                        ? "bg-amber-500/20 border-amber-500/30 text-amber-300"
+                        : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-300"
+                    }`}
+                    data-testid={`chip-skill-${skill.toLowerCase().replace(/\./g, '-')}`}
+                  >
+                    {skill}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid sm:grid-cols-3 gap-4">
@@ -311,9 +349,22 @@ export default function CandidateSearch() {
                           <p className="text-sm text-gray-300 mt-1 line-clamp-2">{dev.bio}</p>
                         )}
                         <div className="flex items-center gap-4 mt-2 text-sm text-gray-400 flex-wrap">
-                          {dev.score && (
+                          {dev.location && (
                             <span className="flex items-center gap-1">
-                              Relevance: {Math.round(dev.score)}
+                              <MapPin className="w-3 h-3" />
+                              {dev.location}
+                            </span>
+                          )}
+                          {dev.repos !== undefined && (
+                            <span className="flex items-center gap-1">
+                              <GitBranch className="w-3 h-3" />
+                              {dev.repos} repos
+                            </span>
+                          )}
+                          {dev.followers !== undefined && (
+                            <span className="flex items-center gap-1">
+                              <UsersIcon className="w-3 h-3" />
+                              {dev.followers} followers
                             </span>
                           )}
                         </div>
