@@ -11,6 +11,8 @@ The platform allows users to:
 - Get hiring recommendations (hire/interview/pass) based on skill alignment
 - **Batch Candidate Comparison**: Compare up to 20 GitHub profiles against a job description and view a ranked leaderboard
 - **Developer Search**: Search GitHub for developers by skills, location, minimum repos, and minimum followers, then select candidates to compare
+- **Saved Analyses**: Save profile analyses to PostgreSQL database and view/reload them later from the /saved page
+- **PDF Export**: Download professional PDF reports with profile info, skills, languages, match scores, and recommendations
 
 ## User Preferences
 
