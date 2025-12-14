@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { Link } from "wouter";
+import { Users, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import ProfileAnalyzer from "@/components/ProfileAnalyzer";
 import ProfileResults, { type ProfileData } from "@/components/ProfileResults";
@@ -105,6 +108,21 @@ export default function Home() {
           isLoading={isAnalysing}
           loadingMessage={analyseMessage}
         />
+
+        <div className="max-w-xl mx-auto mt-6 flex justify-center gap-4">
+          <Link href="/compare">
+            <Button variant="outline" className="border-amber-500/30 text-amber-400" data-testid="link-batch-compare">
+              <Users className="w-4 h-4 mr-2" />
+              Compare Multiple Candidates
+            </Button>
+          </Link>
+          <Link href="/search">
+            <Button variant="outline" className="border-amber-500/30 text-amber-400" data-testid="link-search-developers">
+              <Search className="w-4 h-4 mr-2" />
+              Find Developers
+            </Button>
+          </Link>
+        </div>
 
         {error && (
           <div className="mt-8">
