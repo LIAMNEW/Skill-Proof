@@ -90,6 +90,16 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function getGitHubHeaders() {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github.v3+json",
+  };
+  if (process.env.GITHUB_TOKEN) {
+    headers.Authorization = `token ${process.env.GITHUB_TOKEN}`;
+  }
+  return headers;
+}
+
 async function fetchGitHubData(username: string) {
   const cacheKey = username.toLowerCase();
   const cached = githubCache.get(cacheKey);
@@ -104,17 +114,18 @@ async function fetchGitHubData(username: string) {
     throw new Error(`Rate limit exceeded. Resets in ${Math.ceil(waitTime / 60000)} minutes.`);
   }
 
-  console.log(`Fetching GitHub data for: ${username}`);
-  const userResponse = await axios.get(`https://api.github.com/users/${username}`, {
-    headers: { Accept: "application/vnd.github.v3+json" },
-  });
+  const headers = getGitHubHeaders();
+  console.log(`Fetching GitHub data for: ${username} (authenticated: ${!!process.env.GITHUB_TOKEN})`);
+  
+  const userResponse = await axios.get(`https://api.github.com/users/${username}`, { headers });
   
   rateLimitRemaining = parseInt(userResponse.headers['x-ratelimit-remaining'] || '60');
   rateLimitReset = parseInt(userResponse.headers['x-ratelimit-reset'] || '0') * 1000;
+  console.log(`GitHub API rate limit remaining: ${rateLimitRemaining}`);
   
   const reposResponse = await axios.get(
     `https://api.github.com/users/${username}/repos?sort=updated&per_page=30`,
-    { headers: { Accept: "application/vnd.github.v3+json" } }
+    { headers }
   );
   
   rateLimitRemaining = parseInt(reposResponse.headers['x-ratelimit-remaining'] || '60');
@@ -553,7 +564,7 @@ export async function registerRoutes(
 
       const response = await axios.get(
         `https://api.github.com/search/users?q=${encodeURIComponent(query)}&per_page=20`,
-        { headers: { Accept: "application/vnd.github.v3+json" } }
+        { headers: getGitHubHeaders() }
       );
 
       const users = response.data.items.slice(0, 15).map((user: any) => ({
