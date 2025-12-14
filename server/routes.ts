@@ -392,6 +392,121 @@ Now analyze this match. Return ONLY valid JSON:
   };
 }
 
+const INTERVIEW_QUESTIONS_SYSTEM_PROMPT = `You are a senior technical interviewer creating targeted interview questions based on skill gaps.
+
+Generate questions that:
+1. Probe understanding of concepts the candidate might be weak in
+2. Range from foundational to advanced
+3. Include practical scenarios, not just theory
+4. Are specific and actionable
+
+Difficulty levels:
+- "easy": Basic understanding, terminology, simple use cases
+- "medium": Practical application, common patterns, trade-offs
+- "hard": Advanced scenarios, edge cases, system design
+
+Categories:
+- "conceptual": Understanding of the technology/concept
+- "practical": Hands-on implementation questions
+- "scenario": Real-world problem-solving situations
+
+Return valid JSON only.`;
+
+const INTERVIEW_QUESTIONS_FEW_SHOT = `Example output for missing skills ["GraphQL", "Docker"]:
+{
+  "questions": [
+    {
+      "skill": "GraphQL",
+      "question": "Explain the difference between a Query and a Mutation in GraphQL. When would you use each?",
+      "difficulty": "easy",
+      "category": "conceptual",
+      "followUp": "How would you handle errors in a GraphQL mutation?"
+    },
+    {
+      "skill": "GraphQL",
+      "question": "You're building a social media feed that needs to fetch posts with their authors and comments. Design a GraphQL schema for this and explain how you'd handle N+1 query problems.",
+      "difficulty": "hard",
+      "category": "scenario",
+      "followUp": "How would you implement pagination for this feed?"
+    },
+    {
+      "skill": "Docker",
+      "question": "What is the difference between a Docker image and a Docker container?",
+      "difficulty": "easy",
+      "category": "conceptual",
+      "followUp": "How do you create a Docker image from a Dockerfile?"
+    },
+    {
+      "skill": "Docker",
+      "question": "Your Node.js application works locally but fails in Docker with 'Cannot find module' errors. Walk through your debugging process.",
+      "difficulty": "medium",
+      "category": "practical",
+      "followUp": "How would you optimize the Docker image size for this application?"
+    }
+  ]
+}`;
+
+interface InterviewQuestion {
+  skill: string;
+  question: string;
+  difficulty: "easy" | "medium" | "hard";
+  category: "conceptual" | "practical" | "scenario";
+  followUp?: string;
+}
+
+async function generateInterviewQuestions(missingSkills: string[], jobDescription: string): Promise<InterviewQuestion[]> {
+  if (!missingSkills || missingSkills.length === 0) {
+    return [];
+  }
+
+  const prompt = `Generate targeted interview questions for a candidate who is missing these skills: ${JSON.stringify(missingSkills)}
+
+Job Context:
+${jobDescription.substring(0, 500)}
+
+Generate 2-3 questions per missing skill, covering different difficulty levels.
+
+${INTERVIEW_QUESTIONS_FEW_SHOT}
+
+Now generate questions for the skills above. Return ONLY valid JSON:
+{
+  "questions": [
+    {
+      "skill": "skill name",
+      "question": "the interview question",
+      "difficulty": "easy" | "medium" | "hard",
+      "category": "conceptual" | "practical" | "scenario",
+      "followUp": "optional follow-up question"
+    }
+  ]
+}`;
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-5",
+    max_tokens: 3000,
+    system: INTERVIEW_QUESTIONS_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  try {
+    const textContent = response.content.find(c => c.type === "text");
+    if (textContent && textContent.type === "text") {
+      const parsed = extractJSONFromResponse(textContent.text);
+      return parsed.questions || [];
+    }
+  } catch (parseError) {
+    console.log("Failed to parse interview questions response");
+  }
+
+  return missingSkills.map(skill => ({
+    skill,
+    question: `Explain your experience with ${skill} and how you would approach learning it for this role.`,
+    difficulty: "medium" as const,
+    category: "conceptual" as const,
+    followUp: `What resources would you use to get up to speed with ${skill}?`
+  }));
+}
+
 const CODE_DNA_SYSTEM_PROMPT = `You are an expert developer profiler that analyzes GitHub activity patterns to create a "Code DNA" fingerprint. 
 
 Analyze the provided data to determine:
@@ -657,6 +772,25 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Job matching error:", error);
       res.status(500).json({ error: error.message || "Failed to calculate match" });
+    }
+  });
+
+  app.post("/api/interview-questions", async (req, res) => {
+    try {
+      const { missingSkills, jobDescription } = req.body;
+      
+      if (!missingSkills || !Array.isArray(missingSkills) || missingSkills.length === 0) {
+        return res.status(400).json({ error: "Missing skills array is required" });
+      }
+      if (!jobDescription) {
+        return res.status(400).json({ error: "Job description is required" });
+      }
+
+      const questions = await generateInterviewQuestions(missingSkills, jobDescription);
+      res.json({ questions });
+    } catch (error: any) {
+      console.error("Interview questions error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate questions" });
     }
   });
 

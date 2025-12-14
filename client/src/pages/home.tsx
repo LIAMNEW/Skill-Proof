@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Users, Search, History, X, Save, FolderOpen, FileDown, Dna } from "lucide-react";
+import { Users, Search, History, X, Save, FolderOpen, FileDown, Dna, MessageCircleQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
@@ -10,7 +10,16 @@ import JobMatcher from "@/components/JobMatcher";
 import MatchResults from "@/components/MatchResults";
 import ErrorCard from "@/components/ErrorCard";
 import CodeDNACard from "@/components/CodeDNACard";
+import InterviewQuestionsCard from "@/components/InterviewQuestionsCard";
 import type { CodeDNA } from "@shared/schema";
+
+interface InterviewQuestion {
+  skill: string;
+  question: string;
+  difficulty: "easy" | "medium" | "hard";
+  category: "conceptual" | "practical" | "scenario";
+  followUp?: string;
+}
 
 interface MatchData {
   matchScore: number;
@@ -82,6 +91,8 @@ export default function Home() {
   const [isExporting, setIsExporting] = useState(false);
   const [codeDna, setCodeDna] = useState<CodeDNA | null>(null);
   const [isAnalyzingDna, setIsAnalyzingDna] = useState(false);
+  const [interviewQuestions, setInterviewQuestions] = useState<InterviewQuestion[]>([]);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
   
   const { toast } = useToast();
 
@@ -94,6 +105,7 @@ export default function Home() {
     setProfile(null);
     setMatchData(null);
     setCodeDna(null);
+    setInterviewQuestions([]);
     setIsAnalysing(true);
     
     const messages = ["Fetching profile...", "Loading repositories...", "Analysing code patterns...", "Extracting skills..."];
@@ -136,6 +148,7 @@ export default function Home() {
     setProfile(savedProfile);
     setMatchData(null);
     setCodeDna(null);
+    setInterviewQuestions([]);
     setError(null);
   };
 
@@ -149,6 +162,7 @@ export default function Home() {
     
     setIsMatching(true);
     setMatchData(null);
+    setInterviewQuestions([]);
     setJobDescription(jd);
 
     try {
@@ -281,6 +295,38 @@ export default function Home() {
     }
   };
 
+  const handleGenerateQuestions = async () => {
+    if (!matchData || !matchData.missingSkills || matchData.missingSkills.length === 0) return;
+    
+    setIsGeneratingQuestions(true);
+    try {
+      const response = await fetch("/api/interview-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          missingSkills: matchData.missingSkills, 
+          jobDescription 
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate questions");
+      }
+
+      const data = await response.json();
+      setInterviewQuestions(data.questions);
+    } catch (err) {
+      toast({
+        title: "Failed to generate questions",
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
+  };
+
   const handleRetry = () => {
     setError(null);
   };
@@ -406,7 +452,7 @@ export default function Home() {
             </div>
 
             {matchData && (
-              <div className="mt-8">
+              <div className="mt-8 space-y-6">
                 <MatchResults 
                   matchScore={matchData.matchScore}
                   matchingSkills={matchData.matchingSkills}
@@ -415,6 +461,25 @@ export default function Home() {
                   reasoning={matchData.reasoning}
                   strengthsForRole={matchData.strengthsForRole}
                 />
+                
+                {matchData.missingSkills && matchData.missingSkills.length > 0 && (
+                  <div className="flex justify-center">
+                    <Button
+                      onClick={handleGenerateQuestions}
+                      disabled={isGeneratingQuestions}
+                      variant="outline"
+                      className="border-amber-500/30 text-amber-400"
+                      data-testid="button-generate-questions"
+                    >
+                      <MessageCircleQuestion className="w-4 h-4 mr-2" />
+                      {isGeneratingQuestions ? "Generating Questions..." : "Generate Interview Questions"}
+                    </Button>
+                  </div>
+                )}
+                
+                {interviewQuestions.length > 0 && (
+                  <InterviewQuestionsCard questions={interviewQuestions} />
+                )}
               </div>
             )}
           </div>
