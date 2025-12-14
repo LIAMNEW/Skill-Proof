@@ -1,6 +1,4 @@
-import { Link } from "wouter";
-import { Github, Users, UserSearch } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Github } from "lucide-react";
 
 export default function Header() {
   return (
@@ -16,23 +14,9 @@ export default function Header() {
           SkillProof
         </h1>
       </div>
-      <p className="text-gray-300 text-lg max-w-md mx-auto mb-6" data-testid="text-tagline">
+      <p className="text-gray-300 text-lg max-w-md mx-auto" data-testid="text-tagline">
         Real skills from real code. No more credential inflation.
       </p>
-      <div className="flex flex-wrap justify-center gap-3">
-        <Link href="/compare">
-          <Button variant="outline" className="border-amber-500/30 text-amber-400" data-testid="button-compare-page">
-            <Users className="w-4 h-4 mr-2" />
-            Compare Candidates
-          </Button>
-        </Link>
-        <Link href="/search">
-          <Button variant="outline" className="border-amber-500/30 text-amber-400" data-testid="button-search-page">
-            <UserSearch className="w-4 h-4 mr-2" />
-            Discover Talent
-          </Button>
-        </Link>
-      </div>
     </header>
   );
 }

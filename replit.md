@@ -9,8 +9,6 @@ The platform allows users to:
 - View language distribution, technical skills, and AI-generated experience summaries
 - Paste job descriptions to calculate match scores between candidates and positions
 - Get hiring recommendations (hire/interview/pass) based on skill alignment
-- **Batch Comparison**: Compare multiple candidates simultaneously against a job description with ranked leaderboard
-- **Candidate Discovery**: Search GitHub for developers using skill, location, and activity filters, then select candidates for batch comparison
 
 ## User Preferences
 
@@ -66,12 +64,7 @@ Preferred communication style: Simple, everyday language.
 1. **Monorepo Structure**: Client and server in single repository with shared types for type safety across the stack
 2. **Path Aliases**: `@/` for client source, `@shared/` for shared code, `@assets/` for attached files
 3. **Component Examples**: Each component has an example file in `components/examples/` for isolated testing
-4. **API Design**: POST endpoints for analysis operations (`/api/analyze-github`, `/api/match-job`, `/api/batch-compare`, `/api/search-candidates`)
-
-### Pages
-- `/` - Home page with single profile analysis
-- `/compare` - Batch candidate comparison with leaderboard
-- `/search` - Candidate discovery with filters
+4. **API Design**: POST endpoints for analysis operations (`/api/analyze-github`, `/api/match-job`)
 
 ## External Dependencies
 
