@@ -61,15 +61,32 @@ interface CandidateRanking extends ProfileData {
   rank: number;
 }
 
+let rateLimitRemaining = 60;
+let rateLimitReset = 0;
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function fetchGitHubData(username: string) {
+  if (rateLimitRemaining <= 2 && Date.now() < rateLimitReset) {
+    const waitTime = rateLimitReset - Date.now();
+    throw new Error(`Rate limit exceeded. Resets in ${Math.ceil(waitTime / 60000)} minutes.`);
+  }
+
   const userResponse = await axios.get(`https://api.github.com/users/${username}`, {
     headers: { Accept: "application/vnd.github.v3+json" },
   });
+  
+  rateLimitRemaining = parseInt(userResponse.headers['x-ratelimit-remaining'] || '60');
+  rateLimitReset = parseInt(userResponse.headers['x-ratelimit-reset'] || '0') * 1000;
   
   const reposResponse = await axios.get(
     `https://api.github.com/users/${username}/repos?sort=updated&per_page=30`,
     { headers: { Accept: "application/vnd.github.v3+json" } }
   );
+  
+  rateLimitRemaining = parseInt(reposResponse.headers['x-ratelimit-remaining'] || '60');
 
   return { user: userResponse.data, repos: reposResponse.data };
 }
@@ -282,6 +299,14 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/rate-limit-status", async (req, res) => {
+    res.json({
+      remaining: rateLimitRemaining,
+      resetTime: rateLimitReset,
+      resetIn: rateLimitReset > Date.now() ? Math.ceil((rateLimitReset - Date.now()) / 60000) : 0
+    });
+  });
+
   app.post("/api/batch-compare", async (req, res) => {
     try {
       const { usernames, jobDescription } = req.body;
@@ -296,23 +321,50 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Job description is required" });
       }
 
+      const requiredCalls = usernames.length * 2;
+      if (rateLimitRemaining < requiredCalls && Date.now() < rateLimitReset) {
+        const resetMinutes = Math.ceil((rateLimitReset - Date.now()) / 60000);
+        return res.status(429).json({ 
+          error: `GitHub rate limit too low (${rateLimitRemaining} remaining). Need ~${requiredCalls} calls. Resets in ${resetMinutes} minutes. Try fewer candidates or wait.`,
+          rateLimitRemaining,
+          resetIn: resetMinutes
+        });
+      }
+
       const results: CandidateRanking[] = [];
       const errors: { username: string; error: string }[] = [];
+      let rateLimitHit = false;
 
-      for (const username of usernames) {
+      for (let i = 0; i < usernames.length; i++) {
+        const username = usernames[i];
+        
+        if (rateLimitHit) {
+          errors.push({ username, error: "Skipped due to rate limit" });
+          continue;
+        }
+        
         try {
+          if (i > 0) {
+            await delay(1000);
+          }
+          
           const profile = await analyzeGitHubProfile(username.trim());
           const matchData = await matchProfileToJob(profile, jobDescription);
           results.push({ ...profile, matchData, rank: 0 });
         } catch (error: any) {
-          errors.push({ 
-            username, 
-            error: error.response?.status === 404 
-              ? "User not found" 
-              : error.response?.status === 403 
-                ? "Rate limit exceeded"
-                : "Analysis failed"
-          });
+          const isRateLimit = error.response?.status === 403 || error.message?.includes('Rate limit');
+          
+          if (isRateLimit) {
+            rateLimitHit = true;
+            errors.push({ username, error: "Rate limit exceeded" });
+          } else {
+            errors.push({ 
+              username, 
+              error: error.response?.status === 404 
+                ? "User not found" 
+                : error.message || "Analysis failed"
+            });
+          }
         }
       }
 
@@ -325,7 +377,9 @@ export async function registerRoutes(
         candidates: results, 
         errors,
         totalAnalyzed: results.length,
-        totalFailed: errors.length
+        totalFailed: errors.length,
+        rateLimitRemaining,
+        rateLimitHit
       });
     } catch (error: any) {
       console.error("Batch comparison error:", error);
