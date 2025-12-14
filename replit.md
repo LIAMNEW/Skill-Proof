@@ -9,6 +9,8 @@ The platform allows users to:
 - View language distribution, technical skills, and AI-generated experience summaries
 - Paste job descriptions to calculate match scores between candidates and positions
 - Get hiring recommendations (hire/interview/pass) based on skill alignment
+- **Batch Candidate Comparison**: Compare up to 20 GitHub profiles against a job description and view a ranked leaderboard
+- **Developer Search**: Search GitHub for developers by skills, location, minimum repos, and minimum followers, then select candidates to compare
 
 ## User Preferences
 
@@ -49,7 +51,7 @@ Preferred communication style: Simple, everyday language.
 ├── client/           # React frontend
 │   └── src/
 │       ├── components/   # UI components (ProfileCard, JobMatcher, etc.)
-│       ├── pages/        # Route pages (home, not-found)
+│       ├── pages/        # Route pages (home, compare, search, not-found)
 │       ├── hooks/        # Custom React hooks
 │       └── lib/          # Utilities and query client
 ├── server/           # Express backend
@@ -64,7 +66,8 @@ Preferred communication style: Simple, everyday language.
 1. **Monorepo Structure**: Client and server in single repository with shared types for type safety across the stack
 2. **Path Aliases**: `@/` for client source, `@shared/` for shared code, `@assets/` for attached files
 3. **Component Examples**: Each component has an example file in `components/examples/` for isolated testing
-4. **API Design**: POST endpoints for analysis operations (`/api/analyze-github`, `/api/match-job`)
+4. **API Design**: POST endpoints for analysis operations (`/api/analyze-github`, `/api/match-job`, `/api/batch-compare`, `/api/search-developers`)
+5. **Multi-page Navigation**: Three main pages - Home (/), Batch Compare (/compare), Developer Search (/search) with navigation between them
 
 ## External Dependencies
 
