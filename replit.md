@@ -87,3 +87,20 @@ Preferred communication style: Simple, everyday language.
 - `@tanstack/react-query`: Async state management
 - `@radix-ui/*`: Accessible UI primitives
 - `tailwindcss`: Utility-first CSS framework
+
+## Performance Optimizations
+
+### Server-side Caching
+- GitHub API responses cached in-memory for 1 hour (reduces API calls)
+- Profile analysis results cached to avoid redundant AI calls
+- Cache endpoints: `GET /api/cache-status`, `POST /api/clear-cache`
+
+### AI Prompt Improvements
+- System prompts with skill categorization guidelines
+- Few-shot examples for consistent skill extraction and job matching
+- Structured output format for reliable JSON parsing
+
+### Client-side Persistence
+- Recently analyzed profiles saved to localStorage (up to 10 profiles)
+- Quick access to previously analyzed profiles without re-fetching
+- Profiles displayed as clickable chips in "Recent Profiles" section
