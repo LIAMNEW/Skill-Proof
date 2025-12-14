@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Users, Search, History, X } from "lucide-react";
+import { Users, Search, History, X, Save, FolderOpen, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import ProfileAnalyzer from "@/components/ProfileAnalyzer";
 import ProfileResults, { type ProfileData } from "@/components/ProfileResults";
@@ -74,6 +75,11 @@ export default function Home() {
   
   const [isMatching, setIsMatching] = useState(false);
   const [matchData, setMatchData] = useState<MatchData | null>(null);
+  const [jobDescription, setJobDescription] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  
+  const { toast } = useToast();
 
   useEffect(() => {
     setSavedProfiles(getSavedProfiles());
@@ -132,17 +138,18 @@ export default function Home() {
     setSavedProfiles(removeProfile(username));
   };
 
-  const handleMatch = async (jobDescription: string) => {
+  const handleMatch = async (jd: string) => {
     if (!profile) return;
     
     setIsMatching(true);
     setMatchData(null);
+    setJobDescription(jd);
 
     try {
       const response = await fetch("/api/match-job", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile, jobDescription }),
+        body: JSON.stringify({ profile, jobDescription: jd }),
       });
 
       if (!response.ok) {
@@ -156,6 +163,86 @@ export default function Home() {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       setIsMatching(false);
+    }
+  };
+
+  const handleSaveAnalysis = async () => {
+    if (!profile) return;
+    
+    setIsSaving(true);
+    try {
+      const response = await fetch("/api/analyses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: profile.username,
+          profileData: profile,
+          matchData: matchData || null,
+          jobDescription: jobDescription || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save analysis");
+      }
+
+      toast({
+        title: "Analysis saved",
+        description: `${profile.username}'s analysis has been saved to database.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Failed to save",
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!profile) return;
+    
+    setIsExporting(true);
+    try {
+      const response = await fetch("/api/export-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile,
+          matchData: matchData || null,
+          jobDescription: jobDescription || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate PDF");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${profile.username}-skillproof-report.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "PDF downloaded",
+        description: "Your report has been downloaded successfully.",
+      });
+    } catch (err) {
+      toast({
+        title: "Failed to export",
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -185,6 +272,12 @@ export default function Home() {
             <Button variant="outline" className="border-amber-500/30 text-amber-400" data-testid="link-search-developers">
               <Search className="w-4 h-4 mr-2" />
               Find Developers
+            </Button>
+          </Link>
+          <Link href="/saved">
+            <Button variant="outline" className="border-amber-500/30 text-amber-400" data-testid="link-saved-analyses">
+              <FolderOpen className="w-4 h-4 mr-2" />
+              Saved Analyses
             </Button>
           </Link>
         </div>
@@ -231,6 +324,29 @@ export default function Home() {
         {profile && !error && (
           <div className="mt-8 space-y-8">
             <ProfileResults profile={profile} />
+            
+            <div className="flex justify-center gap-4 flex-wrap">
+              <Button
+                onClick={handleSaveAnalysis}
+                disabled={isSaving}
+                variant="outline"
+                className="border-amber-500/30 text-amber-400"
+                data-testid="button-save-analysis"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {isSaving ? "Saving..." : "Save Analysis"}
+              </Button>
+              <Button
+                onClick={handleExportPdf}
+                disabled={isExporting}
+                variant="outline"
+                className="border-amber-500/30 text-amber-400"
+                data-testid="button-export-pdf"
+              >
+                <FileDown className="w-4 h-4 mr-2" />
+                {isExporting ? "Generating..." : "Download PDF Report"}
+              </Button>
+            </div>
             
             <div className="border-t border-white/10 pt-8">
               <JobMatcher 

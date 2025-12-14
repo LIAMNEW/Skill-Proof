@@ -1,13 +1,16 @@
-import { type User, type InsertUser } from "@shared/schema";
+import { type User, type InsertUser, type SavedAnalysis, type InsertSavedAnalysis, savedAnalyses } from "@shared/schema";
 import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  saveAnalysis(analysis: InsertSavedAnalysis): Promise<SavedAnalysis>;
+  getAnalyses(): Promise<SavedAnalysis[]>;
+  getAnalysisById(id: number): Promise<SavedAnalysis | undefined>;
+  deleteAnalysis(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -32,6 +35,25 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
+  }
+
+  async saveAnalysis(analysis: InsertSavedAnalysis): Promise<SavedAnalysis> {
+    const [saved] = await db.insert(savedAnalyses).values(analysis).returning();
+    return saved;
+  }
+
+  async getAnalyses(): Promise<SavedAnalysis[]> {
+    return await db.select().from(savedAnalyses).orderBy(desc(savedAnalyses.createdAt));
+  }
+
+  async getAnalysisById(id: number): Promise<SavedAnalysis | undefined> {
+    const [analysis] = await db.select().from(savedAnalyses).where(eq(savedAnalyses.id, id));
+    return analysis;
+  }
+
+  async deleteAnalysis(id: number): Promise<boolean> {
+    const result = await db.delete(savedAnalyses).where(eq(savedAnalyses.id, id)).returning();
+    return result.length > 0;
   }
 }
 

@@ -2,6 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Anthropic from "@anthropic-ai/sdk";
 import axios from "axios";
+import PDFDocument from "pdfkit";
+import { storage } from "./storage";
+import { insertSavedAnalysisSchema } from "@shared/schema";
 
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
@@ -608,6 +611,179 @@ export async function registerRoutes(
       }
       
       res.status(500).json({ error: error.message || "Failed to search developers" });
+    }
+  });
+
+  app.post("/api/analyses", async (req, res) => {
+    try {
+      const validatedData = insertSavedAnalysisSchema.parse(req.body);
+      const saved = await storage.saveAnalysis(validatedData);
+      res.status(201).json(saved);
+    } catch (error: any) {
+      console.error("Save analysis error:", error);
+      res.status(400).json({ error: error.message || "Failed to save analysis" });
+    }
+  });
+
+  app.get("/api/analyses", async (req, res) => {
+    try {
+      const analyses = await storage.getAnalyses();
+      res.json(analyses);
+    } catch (error: any) {
+      console.error("Get analyses error:", error);
+      res.status(500).json({ error: error.message || "Failed to get analyses" });
+    }
+  });
+
+  app.get("/api/analyses/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid analysis ID" });
+      }
+      const analysis = await storage.getAnalysisById(id);
+      if (!analysis) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+      res.json(analysis);
+    } catch (error: any) {
+      console.error("Get analysis error:", error);
+      res.status(500).json({ error: error.message || "Failed to get analysis" });
+    }
+  });
+
+  app.delete("/api/analyses/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid analysis ID" });
+      }
+      const deleted = await storage.deleteAnalysis(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+      res.json({ message: "Analysis deleted successfully" });
+    } catch (error: any) {
+      console.error("Delete analysis error:", error);
+      res.status(500).json({ error: error.message || "Failed to delete analysis" });
+    }
+  });
+
+  app.post("/api/export-pdf", async (req, res) => {
+    try {
+      const { profile, matchData, jobDescription } = req.body;
+      
+      if (!profile) {
+        return res.status(400).json({ error: "Profile data is required" });
+      }
+
+      const doc = new PDFDocument({ margin: 50 });
+      const chunks: Buffer[] = [];
+      
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => {
+        const pdfBuffer = Buffer.concat(chunks);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${profile.username}-skillproof-report.pdf"`);
+        res.send(pdfBuffer);
+      });
+
+      doc.fontSize(24).fillColor('#0a0a0f').text('SkillProof Report', { align: 'center' });
+      doc.moveDown(0.5);
+      doc.fontSize(10).fillColor('#666').text(`Generated on ${new Date().toLocaleDateString()}`, { align: 'center' });
+      doc.moveDown(1.5);
+
+      doc.fontSize(18).fillColor('#0a0a0f').text('Candidate Profile');
+      doc.moveDown(0.5);
+      doc.fontSize(12).fillColor('#333')
+        .text(`Name: ${profile.name || profile.username}`)
+        .text(`GitHub: @${profile.username}`)
+        .text(`Repositories: ${profile.repos}`)
+        .text(`Followers: ${profile.followers}`);
+      if (profile.location) doc.text(`Location: ${profile.location}`);
+      if (profile.bio) {
+        doc.moveDown(0.3);
+        doc.text(`Bio: ${profile.bio}`);
+      }
+      doc.moveDown(1);
+
+      doc.fontSize(18).fillColor('#0a0a0f').text('Technical Skills');
+      doc.moveDown(0.5);
+      doc.fontSize(12).fillColor('#333').text(profile.skills.join(', '));
+      doc.moveDown(1);
+
+      if (profile.languages && profile.languages.length > 0) {
+        doc.fontSize(18).fillColor('#0a0a0f').text('Programming Languages');
+        doc.moveDown(0.5);
+        profile.languages.forEach((lang: { name: string; percentage: number }) => {
+          doc.fontSize(12).fillColor('#333').text(`${lang.name}: ${lang.percentage.toFixed(1)}%`);
+        });
+        doc.moveDown(1);
+      }
+
+      if (profile.experienceSummary) {
+        doc.fontSize(18).fillColor('#0a0a0f').text('Experience Summary');
+        doc.moveDown(0.5);
+        doc.fontSize(12).fillColor('#333').text(profile.experienceSummary);
+        doc.moveDown(1);
+      }
+
+      if (profile.strengths && profile.strengths.length > 0) {
+        doc.fontSize(18).fillColor('#0a0a0f').text('Key Strengths');
+        doc.moveDown(0.5);
+        profile.strengths.forEach((strength: string) => {
+          doc.fontSize(12).fillColor('#333').text(`• ${strength}`);
+        });
+        doc.moveDown(1);
+      }
+
+      if (matchData) {
+        doc.addPage();
+        doc.fontSize(18).fillColor('#0a0a0f').text('Job Match Analysis');
+        doc.moveDown(0.5);
+        
+        const scoreColor = matchData.matchScore >= 80 ? '#22c55e' : matchData.matchScore >= 60 ? '#f59e0b' : '#ef4444';
+        doc.fontSize(32).fillColor(scoreColor).text(`${matchData.matchScore}%`, { align: 'center' });
+        doc.fontSize(12).fillColor('#666').text('Match Score', { align: 'center' });
+        doc.moveDown(1);
+
+        const recColor = matchData.recommendation === 'hire' ? '#22c55e' : matchData.recommendation === 'interview' ? '#f59e0b' : '#ef4444';
+        doc.fontSize(16).fillColor(recColor).text(`Recommendation: ${matchData.recommendation.toUpperCase()}`, { align: 'center' });
+        doc.moveDown(1);
+
+        if (matchData.reasoning) {
+          doc.fontSize(14).fillColor('#0a0a0f').text('Analysis');
+          doc.moveDown(0.3);
+          doc.fontSize(12).fillColor('#333').text(matchData.reasoning);
+          doc.moveDown(1);
+        }
+
+        if (matchData.matchingSkills && matchData.matchingSkills.length > 0) {
+          doc.fontSize(14).fillColor('#22c55e').text('Matching Skills');
+          doc.moveDown(0.3);
+          doc.fontSize(12).fillColor('#333').text(matchData.matchingSkills.join(', '));
+          doc.moveDown(0.8);
+        }
+
+        if (matchData.missingSkills && matchData.missingSkills.length > 0) {
+          doc.fontSize(14).fillColor('#ef4444').text('Missing Skills');
+          doc.moveDown(0.3);
+          doc.fontSize(12).fillColor('#333').text(matchData.missingSkills.join(', '));
+          doc.moveDown(0.8);
+        }
+
+        if (jobDescription) {
+          doc.moveDown(0.5);
+          doc.fontSize(14).fillColor('#0a0a0f').text('Job Description');
+          doc.moveDown(0.3);
+          doc.fontSize(10).fillColor('#666').text(jobDescription.substring(0, 1000));
+        }
+      }
+
+      doc.end();
+    } catch (error: any) {
+      console.error("PDF export error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate PDF" });
     }
   });
 

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/home";
 import Compare from "@/pages/compare";
 import CandidateSearch from "@/pages/search";
+import SavedAnalyses from "@/pages/saved";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -14,6 +15,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/compare" component={Compare} />
       <Route path="/search" component={CandidateSearch} />
+      <Route path="/saved" component={SavedAnalyses} />
       <Route component={NotFound} />
     </Switch>
   );
