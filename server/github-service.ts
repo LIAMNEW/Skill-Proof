@@ -313,12 +313,12 @@ export async function searchGitHubUsers(query: {
   const searchQuery = searchParts.join(" ") || "type:user";
   
   const response = await axios.get(
-    `https://api.github.com/search/users?q=${encodeURIComponent(searchQuery)}&per_page=30`,
+    `https://api.github.com/search/users?q=${encodeURIComponent(searchQuery)}&per_page=20`,
     { headers: { Accept: "application/vnd.github.v3+json" } }
   );
 
   const users = await Promise.all(
-    response.data.items.slice(0, 30).map(async (item: any) => {
+    response.data.items.slice(0, 10).map(async (item: any) => {
       try {
         const userResponse = await axios.get(item.url, {
           headers: { Accept: "application/vnd.github.v3+json" },
