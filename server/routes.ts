@@ -34,6 +34,13 @@ const languageColors: Record<string, string> = {
   Elixir: "#6e4a7e",
 };
 
+interface SkillVerificationScore {
+  score: number; // 0-100
+  frequency: number; // number of repos using this skill
+  recencyBonus: number; // bonus from recent activity
+  complexityBonus: number; // bonus from project complexity (stars, forks)
+}
+
 interface ProfileData {
   username: string;
   name: string;
@@ -45,6 +52,7 @@ interface ProfileData {
   languages: { name: string; percentage: number; color: string }[];
   skills: string[];
   proficiencyLevels: Record<string, string>;
+  skillVerificationScores: Record<string, SkillVerificationScore>;
   experienceSummary: string;
   strengths: string[];
   notableProjects: string[];
@@ -159,6 +167,109 @@ function calculateLanguageStats(repos: any[]) {
       percentage: (count / total) * 100,
       color: languageColors[name] || "#6b7280",
     }));
+}
+
+function calculateSkillVerificationScores(
+  skills: string[],
+  repos: any[],
+  languages: { name: string; percentage: number }[]
+): Record<string, SkillVerificationScore> {
+  const scores: Record<string, SkillVerificationScore> = {};
+  const now = new Date();
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+  for (const skill of skills) {
+    const skillLower = skill.toLowerCase();
+    
+    // Count repos using this skill (by language or mentioned in description/name)
+    // Use word boundary matching for short skill names to avoid false positives
+    const isShortSkill = skillLower.length <= 3;
+    const skillPattern = isShortSkill 
+      ? new RegExp(`\\b${skillLower}\\b`, 'i') 
+      : null;
+    
+    const matchingRepos = repos.filter((r: any) => {
+      // Exact match for language
+      const langMatch = r.language?.toLowerCase() === skillLower;
+      
+      // For short skills, use word boundary matching
+      const repoName = r.name?.toLowerCase() || '';
+      const repoDesc = r.description?.toLowerCase() || '';
+      
+      let nameMatch = false;
+      let descMatch = false;
+      
+      if (isShortSkill && skillPattern) {
+        nameMatch = skillPattern.test(repoName);
+        descMatch = skillPattern.test(repoDesc);
+      } else {
+        nameMatch = repoName.includes(skillLower);
+        descMatch = repoDesc.includes(skillLower);
+      }
+      
+      return langMatch || nameMatch || descMatch;
+    });
+    
+    const frequency = matchingRepos.length;
+    
+    // Recency bonus - repos updated in last 6 months get 3x weight, last year gets 1.5x
+    let recencyBonus = 0;
+    for (const repo of matchingRepos) {
+      const updatedDate = new Date(repo.updated_at);
+      if (updatedDate > sixMonthsAgo) {
+        recencyBonus += 15; // Recent activity bonus
+      } else if (updatedDate > oneYearAgo) {
+        recencyBonus += 5; // Moderate recency bonus
+      }
+    }
+    recencyBonus = Math.min(recencyBonus, 30); // Cap at 30
+    
+    // Complexity bonus - based on stars, forks, and size
+    let complexityBonus = 0;
+    for (const repo of matchingRepos) {
+      const stars = repo.stargazers_count || 0;
+      const forks = repo.forks_count || 0;
+      const size = repo.size || 0;
+      
+      // Stars have the most weight
+      if (stars >= 100) complexityBonus += 15;
+      else if (stars >= 50) complexityBonus += 10;
+      else if (stars >= 10) complexityBonus += 5;
+      else if (stars >= 1) complexityBonus += 2;
+      
+      // Forks indicate community usage
+      if (forks >= 20) complexityBonus += 10;
+      else if (forks >= 5) complexityBonus += 5;
+      else if (forks >= 1) complexityBonus += 2;
+      
+      // Larger projects indicate deeper work
+      if (size >= 10000) complexityBonus += 5;
+      else if (size >= 1000) complexityBonus += 2;
+    }
+    complexityBonus = Math.min(complexityBonus, 30); // Cap at 30
+    
+    // Base score from frequency (max 40 points)
+    const baseScore = Math.min(frequency * 8, 40);
+    
+    // Check if this is a primary language
+    const langEntry = languages.find(l => l.name.toLowerCase() === skillLower);
+    const languageBonus = langEntry ? Math.min(langEntry.percentage / 5, 10) : 0;
+    
+    // Total score (max 100)
+    const totalScore = Math.min(Math.round(baseScore + recencyBonus + complexityBonus + languageBonus), 100);
+    
+    scores[skill] = {
+      score: totalScore,
+      frequency,
+      recencyBonus: Math.round(recencyBonus),
+      complexityBonus: Math.round(complexityBonus),
+    };
+  }
+  
+  return scores;
 }
 
 function extractJSONFromResponse(text: string): any {
@@ -284,6 +395,9 @@ Now analyze the profile above and return ONLY valid JSON:
     };
   }
 
+  const skillsList = aiData.skills || [];
+  const skillVerificationScores = calculateSkillVerificationScores(skillsList, repos, languages);
+
   const profileData: ProfileData = {
     username: user.login,
     name: user.name || user.login,
@@ -293,8 +407,9 @@ Now analyze the profile above and return ONLY valid JSON:
     followers: user.followers,
     location: user.location,
     languages,
-    skills: aiData.skills || [],
+    skills: skillsList,
     proficiencyLevels: aiData.proficiency_levels || {},
+    skillVerificationScores,
     experienceSummary: aiData.experience_summary || "",
     strengths: aiData.strengths || [],
     notableProjects: aiData.notable_projects || [],

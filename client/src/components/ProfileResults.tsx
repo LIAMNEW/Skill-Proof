@@ -9,6 +9,13 @@ interface Language {
   color: string;
 }
 
+export interface SkillVerificationScore {
+  score: number;
+  frequency: number;
+  recencyBonus: number;
+  complexityBonus: number;
+}
+
 export interface ProfileData {
   username: string;
   name: string;
@@ -20,6 +27,7 @@ export interface ProfileData {
   languages: Language[];
   skills: string[];
   proficiencyLevels: Record<string, string>;
+  skillVerificationScores?: Record<string, SkillVerificationScore>;
   experienceSummary: string;
   strengths?: string[];
   notableProjects?: string[];
@@ -46,7 +54,8 @@ export default function ProfileResults({ profile }: ProfileResultsProps) {
         <LanguageChart languages={profile.languages} />
         <SkillsGrid 
           skills={profile.skills} 
-          proficiencyLevels={profile.proficiencyLevels} 
+          proficiencyLevels={profile.proficiencyLevels}
+          verificationScores={profile.skillVerificationScores}
         />
       </div>
       
