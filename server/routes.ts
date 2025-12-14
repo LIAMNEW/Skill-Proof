@@ -64,16 +64,47 @@ interface CandidateRanking extends ProfileData {
 let rateLimitRemaining = 60;
 let rateLimitReset = 0;
 
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const githubCache = new Map<string, CacheEntry<{ user: any; repos: any[] }>>();
+const profileCache = new Map<string, CacheEntry<ProfileData>>();
+
+function isCacheValid<T>(entry: CacheEntry<T> | undefined): entry is CacheEntry<T> {
+  return entry !== undefined && (Date.now() - entry.timestamp) < CACHE_TTL;
+}
+
+function getCacheStats() {
+  return {
+    githubCacheSize: githubCache.size,
+    profileCacheSize: profileCache.size,
+    cacheTTL: CACHE_TTL / 60000 + " minutes"
+  };
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function fetchGitHubData(username: string) {
+  const cacheKey = username.toLowerCase();
+  const cached = githubCache.get(cacheKey);
+  
+  if (isCacheValid(cached)) {
+    console.log(`Cache hit for GitHub data: ${username}`);
+    return cached.data;
+  }
+
   if (rateLimitRemaining <= 2 && Date.now() < rateLimitReset) {
     const waitTime = rateLimitReset - Date.now();
     throw new Error(`Rate limit exceeded. Resets in ${Math.ceil(waitTime / 60000)} minutes.`);
   }
 
+  console.log(`Fetching GitHub data for: ${username}`);
   const userResponse = await axios.get(`https://api.github.com/users/${username}`, {
     headers: { Accept: "application/vnd.github.v3+json" },
   });
@@ -88,7 +119,10 @@ async function fetchGitHubData(username: string) {
   
   rateLimitRemaining = parseInt(reposResponse.headers['x-ratelimit-remaining'] || '60');
 
-  return { user: userResponse.data, repos: reposResponse.data };
+  const result = { user: userResponse.data, repos: reposResponse.data };
+  githubCache.set(cacheKey, { data: result, timestamp: Date.now() });
+  
+  return result;
 }
 
 function calculateLanguageStats(repos: any[]) {
@@ -126,7 +160,47 @@ function extractJSONFromResponse(text: string): any {
   throw new Error("No valid JSON found in response");
 }
 
+const SKILL_ANALYSIS_SYSTEM_PROMPT = `You are a technical recruiter AI that analyzes GitHub profiles to extract skills and experience. 
+
+Your task is to:
+1. Identify technical skills from repository languages, descriptions, and project types
+2. Categorize proficiency levels based on evidence (expert: many repos/stars, intermediate: some repos, beginner: few repos)
+3. Identify strengths based on project complexity and contributions
+4. Write concise, professional summaries
+
+Skill categories to consider:
+- Programming Languages (JavaScript, Python, Go, Rust, etc.)
+- Frameworks (React, Vue, Django, Express, etc.)
+- Databases (PostgreSQL, MongoDB, Redis, etc.)
+- Cloud/DevOps (AWS, Docker, Kubernetes, CI/CD)
+- Specializations (Machine Learning, Mobile Dev, Game Dev, etc.)
+
+Always return valid JSON without markdown formatting.`;
+
+const SKILL_ANALYSIS_FEW_SHOT = `Example input:
+User: Jane Developer
+Repos: 45, Followers: 230
+Languages: TypeScript 60%, Python 25%, Go 15%
+Top repos: "react-dashboard" (React, 120 stars), "ml-pipeline" (Python, 85 stars), "api-gateway" (Go, 45 stars)
+
+Example output:
+{
+  "skills": ["TypeScript", "React", "Python", "Machine Learning", "Go", "REST APIs", "PostgreSQL", "Docker"],
+  "proficiency_levels": {"TypeScript": "expert", "React": "expert", "Python": "advanced", "Machine Learning": "intermediate", "Go": "intermediate"},
+  "strengths": ["Full-stack web development", "Data pipeline architecture", "API design"],
+  "experience_summary": "Experienced full-stack developer with strong TypeScript/React expertise and growing ML capabilities. Active open source contributor with 45 repositories and 230 followers.",
+  "notable_projects": ["react-dashboard", "ml-pipeline", "api-gateway"]
+}`;
+
 async function analyzeGitHubProfile(username: string): Promise<ProfileData> {
+  const cacheKey = username.toLowerCase();
+  const cachedProfile = profileCache.get(cacheKey);
+  
+  if (isCacheValid(cachedProfile)) {
+    console.log(`Cache hit for profile: ${username}`);
+    return cachedProfile.data;
+  }
+
   const { user, repos } = await fetchGitHubData(username);
   const languages = calculateLanguageStats(repos);
   
@@ -136,23 +210,34 @@ async function analyzeGitHubProfile(username: string): Promise<ProfileData> {
     stars: r.stargazers_count,
     forks: r.forks_count,
     language: r.language,
+    updatedAt: r.updated_at,
   }));
 
   const languageStats = languages.map(l => `${l.name}: ${l.percentage.toFixed(1)}%`).join(", ");
+  
+  const recentActivity = repos.filter((r: any) => {
+    const updatedDate = new Date(r.updated_at);
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    return updatedDate > sixMonthsAgo;
+  }).length;
 
   const prompt = `Analyze this GitHub profile and extract technical skills.
 
 User: ${user.name || username}
-Bio: ${user.bio || "No bio"}
-Repos: ${user.public_repos}
+Bio: ${user.bio || "No bio provided"}
+Public Repos: ${user.public_repos}
 Followers: ${user.followers}
+Recently Active Repos (last 6 months): ${recentActivity}
 
 Top Repositories:
 ${JSON.stringify(topRepos, null, 2)}
 
 Languages: ${languageStats}
 
-Return ONLY valid JSON (no markdown):
+${SKILL_ANALYSIS_FEW_SHOT}
+
+Now analyze the profile above and return ONLY valid JSON:
 {
   "skills": ["skill1", "skill2", "..."],
   "proficiency_levels": {"skill1": "expert", "skill2": "intermediate"},
@@ -164,6 +249,7 @@ Return ONLY valid JSON (no markdown):
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
     max_tokens: 2000,
+    system: SKILL_ANALYSIS_SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -183,7 +269,7 @@ Return ONLY valid JSON (no markdown):
     };
   }
 
-  return {
+  const profileData: ProfileData = {
     username: user.login,
     name: user.name || user.login,
     avatar: user.avatar_url,
@@ -198,20 +284,56 @@ Return ONLY valid JSON (no markdown):
     strengths: aiData.strengths || [],
     notableProjects: aiData.notable_projects || [],
   };
+  
+  profileCache.set(cacheKey, { data: profileData, timestamp: Date.now() });
+  
+  return profileData;
 }
 
+const JOB_MATCHING_SYSTEM_PROMPT = `You are a technical recruiting expert that matches candidates to job descriptions.
+
+Your scoring criteria:
+- 90-100: Perfect match - all critical skills present, strong experience
+- 75-89: Strong match - most skills present, relevant experience  
+- 60-74: Good match - some skills present, transferable experience
+- 40-59: Partial match - few skills, would need training
+- 0-39: Poor match - missing critical skills
+
+Recommendations:
+- "hire": Score 80+ with all must-have skills
+- "interview": Score 60-79 or strong potential
+- "pass": Score below 60 or missing critical requirements
+
+Be specific about which skills match and which are missing. Consider skill proficiency levels.`;
+
+const JOB_MATCHING_FEW_SHOT = `Example:
+Candidate: TypeScript (expert), React (expert), Node.js (intermediate), PostgreSQL (beginner)
+Job: "Senior React Developer - 5+ years React, TypeScript required, GraphQL preferred"
+
+{
+  "match_score": 82,
+  "matching_skills": ["TypeScript", "React", "Node.js"],
+  "missing_skills": ["GraphQL"],
+  "strengths_for_role": ["Expert React developer", "Strong TypeScript foundation"],
+  "recommendation": "interview",
+  "reasoning": "Strong React/TypeScript match for senior role. Missing GraphQL but has solid foundation to learn quickly. Worth interviewing to assess experience level."
+}`;
+
 async function matchProfileToJob(profile: ProfileData, jobDescription: string): Promise<MatchData> {
-  const prompt = `Compare candidate skills to job requirements and provide a match analysis.
+  const prompt = `Compare this candidate to the job requirements.
 
-Candidate Skills: ${JSON.stringify(profile.skills)}
-Candidate Proficiency Levels: ${JSON.stringify(profile.proficiencyLevels)}
-Candidate Strengths: ${JSON.stringify(profile.strengths)}
-Experience Summary: ${profile.experienceSummary}
+CANDIDATE:
+Skills: ${JSON.stringify(profile.skills)}
+Proficiency Levels: ${JSON.stringify(profile.proficiencyLevels)}
+Strengths: ${JSON.stringify(profile.strengths)}
+Experience: ${profile.experienceSummary}
 
-Job Description:
+JOB DESCRIPTION:
 ${jobDescription}
 
-Analyze how well this candidate matches the job requirements. Return ONLY valid JSON (no markdown):
+${JOB_MATCHING_FEW_SHOT}
+
+Now analyze this match. Return ONLY valid JSON:
 {
   "match_score": 85,
   "matching_skills": ["skill1", "skill2"],
@@ -224,6 +346,7 @@ Analyze how well this candidate matches the job requirements. Return ONLY valid 
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
     max_tokens: 2000,
+    system: JOB_MATCHING_SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -305,6 +428,28 @@ export async function registerRoutes(
       resetTime: rateLimitReset,
       resetIn: rateLimitReset > Date.now() ? Math.ceil((rateLimitReset - Date.now()) / 60000) : 0
     });
+  });
+
+  app.get("/api/cache-status", async (req, res) => {
+    res.json({
+      ...getCacheStats(),
+      rateLimitRemaining,
+      rateLimitResetIn: rateLimitReset > Date.now() ? Math.ceil((rateLimitReset - Date.now()) / 60000) : 0
+    });
+  });
+
+  app.post("/api/clear-cache", async (req, res) => {
+    const { username } = req.body;
+    if (username) {
+      const key = username.toLowerCase();
+      githubCache.delete(key);
+      profileCache.delete(key);
+      res.json({ message: `Cache cleared for ${username}` });
+    } else {
+      githubCache.clear();
+      profileCache.clear();
+      res.json({ message: "All caches cleared" });
+    }
   });
 
   app.post("/api/batch-compare", async (req, res) => {
